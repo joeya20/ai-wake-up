@@ -1,4 +1,7 @@
 # config file
 orig_code: "py2c/conv.py"
+pytest: "py2c/test.py"
+ctest: "py2c/test.c"
 top_function: "conv_layer"
 out_folder: "outputs"
+c_signature: "void conv_layer(float x[2][3][4][4], float output[2][4][4], float W[3][3][3][2], float b[2], int stride, int pad){"

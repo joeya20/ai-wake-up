@@ -4,12 +4,12 @@ import os
 
 client = OpenAI()
 
-# model_name = "gpt-4-turbo-2024-04-09"
-model_name = "gpt-3.5-turbo-0125"
+model_name = "gpt-4-turbo-2024-04-09"
+# model_name = "gpt-3.5-turbo-0125"
 system_content = """You are an expert software engineer specialized in Python and C programming.
-Your task is to rewrite a given Python code in C. You will be provided with the original Python code and a unit test.
-You need to write a C function and a main function that tests the C function in the same way as the unit test.
-Only produce code that is complete and ready to compile and run.
+Your task is to rewrite a given Python code in C. 
+Do not provide a main function, just make sure to provide the function signature as requested.
+Only produce code that is complete and correct.
 """
 # parse yaml file with orig code test code includes and tcl; and top function
 import yaml
@@ -29,9 +29,19 @@ with open(config_file, "r") as f:
 with open(config["orig_code"], "r") as f:
     orig_code = f.read()
 
+# load python test
+with open(config["pytest"], "r") as f:
+    test_code = f.read()
+
+# load c test
+with open(config["ctest"], "r") as f:
+    test_code_dut = f.read()
+
 orig_file = config["orig_code"] 
 
 top_function = config["top_function"]
+
+c_signature = config["c_signature"]
 
 # out folder
 out_folder = config["out_folder"]
@@ -44,7 +54,8 @@ if not os.path.exists(out_folder):
 message_list=[
         {"role": "system", "content": system_content},
         {"role": "user", "content": f"""Help me rewrite the Python function '{top_function}' in C. 
-         Make also a main function that tests {top_function} in the same way and produces the same output. \n\n {orig_code}\n"""}
+        \n\n {orig_code}\
+         \n\n The function signature should be: \n {c_signature}"""}
     ]
 # counter
 total_gpt_runs =0
@@ -54,6 +65,10 @@ while error != None:
     error = None
     print("iteration ", i)
     if i ==10:
+        #write message list to file
+        with open(out_folder + "message_list.txt", "w") as f:
+            for message in message_list:
+                f.write(f"{message['role']}: {message['content']}\n")
         exit(1)
     i+=1
     # prompt
@@ -76,7 +91,7 @@ while error != None:
     with open(file_name, "w") as f:
         # f.write(inlcudes)
         f.write(c_code_dut)
-        # f.write(test_code_dut)
+        f.write(test_code_dut)
 
     # compile the file with gcc
     print("Compiling the code")
@@ -91,11 +106,14 @@ while error != None:
         continue
 
     
-
+    # build python test
+    with open(out_folder + "/temp_test.py", "w") as f:
+        f.write(orig_code)
+        f.write(test_code)
     
     # run the compiled files and check the outputs match
     out_dut = subprocess.run(["./temp_dut"], capture_output=True)
-    out_ref = subprocess.run(["python3", orig_file], capture_output=True)
+    out_ref = subprocess.run(["python3", out_folder + "/temp_test.py"], capture_output=True)
 
     # check the outputs match, ignore whitespaces and new lines
     if out_dut.stdout.decode().replace(" ", "").replace("\n", "").replace("[", "").replace("]", "") == out_ref.stdout.decode().replace(" ", "").replace("\n", "").replace("[", "").replace("]", ""):
@@ -115,3 +133,8 @@ while error != None:
 with open(out_folder + f"{top_function}.c", "w") as f:
     f.write(c_code_dut)
 print("The code is correct, number of gpt runs: ", total_gpt_runs)
+
+#write message list to file
+with open(out_folder + "message_list.txt", "w") as f:
+    for message in message_list:
+        f.write(f"{message['role']}: {message['content']}\n")
