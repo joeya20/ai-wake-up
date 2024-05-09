@@ -1,0 +1,4 @@
+# config file
+orig_code: "py2c/conv.py"
+top_function: "conv_layer"
+out_folder: "outputs"
